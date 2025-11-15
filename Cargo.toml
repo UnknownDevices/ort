@@ -67,6 +67,7 @@ alternative-backend = [ "ort-sys/disable-linking" ]
 
 cuda = [ "ort-sys/cuda" ]
 tensorrt = [ "ort-sys/tensorrt" ]
+tensorrt_rtx = [ "ort-sys/tensorrt_rtx" ]
 openvino = [ "ort-sys/openvino" ]
 onednn = [ "ort-sys/onednn" ]
 directml = [ "ort-sys/directml" ]

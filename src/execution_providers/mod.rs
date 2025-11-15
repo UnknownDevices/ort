@@ -29,6 +29,8 @@ pub mod cuda;
 pub use self::cuda::CUDAExecutionProvider;
 pub mod tensorrt;
 pub use self::tensorrt::TensorRTExecutionProvider;
+pub mod tensorrt_rtx;
+pub use self::tensorrt_rtx::TensorRTRTXExecutionProvider;
 pub mod onednn;
 pub use self::onednn::OneDNNExecutionProvider;
 pub mod acl;

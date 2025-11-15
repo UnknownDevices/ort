@@ -27,6 +27,7 @@ disable-linking = []
 
 cuda = []
 tensorrt = []
+tensorrt_rtx = []
 openvino = []
 onednn = []
 directml = []
