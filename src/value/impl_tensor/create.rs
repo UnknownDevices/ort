@@ -111,7 +111,6 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		let tensor = DynTensor::new(allocator, T::into_tensor_element_type(), shape)?;
 		Ok(unsafe { tensor.transmute_type() })
 	}
-
 	/// Construct an owned tensor from an array of data.
 	///
 	/// Owned tensors can be created from:
@@ -142,6 +141,18 @@ impl<T: PrimitiveTensorElementType + Debug> Tensor<T> {
 		let TensorArrayDataParts { shape, ptr, guard } = input.into_parts()?;
 		tensor_from_array(MemoryInfo::default(), shape, ptr.as_ptr().cast(), size_of::<T>(), T::into_tensor_element_type(), guard)
 			.map(|tensor| unsafe { tensor.transmute_type() })
+	}
+
+	/// Construct a tensor from raw memory with the given memory info and shape.
+	///
+	/// # Safety
+	/// - The pointer must be valid for the device described by `memory_info`.
+	/// - The data size must be at least `shape.num_elements() * size_of::<T>()` bytes.
+	/// - The caller must ensure the data remains valid for the lifetime of the tensor.
+	pub unsafe fn from_raw(memory_info: MemoryInfo, ptr: *mut c_void, shape: impl Into<Shape>) -> Result<Tensor<T>> {
+		let shape = shape.into();
+
+		tensor_from_array(memory_info, shape, ptr, size_of::<T>(), T::into_tensor_element_type(), None).map(|tensor| unsafe { tensor.transmute_type() })
 	}
 }
 
