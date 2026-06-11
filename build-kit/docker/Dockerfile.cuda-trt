@@ -5,9 +5,13 @@ FROM ${NV_TENSORRT_IMAGE}
 ARG ORT_VERSION=v1.22.0
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-      git ninja-build ccache patchelf ca-certificates curl \
-   && rm -rf /var/lib/apt/lists/*
+# Clean authenticated install first; fall back to tolerant flags if the image's
+# CUDA apt repo has a stale key / Release.
+RUN PKGS="git ninja-build ccache patchelf ca-certificates curl"; \
+    if ! { apt-get update && apt-get install -y --no-install-recommends $PKGS; }; then \
+       apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::AllowInsecureRepositories=true && \
+       apt-get install -y --no-install-recommends --allow-unauthenticated $PKGS; \
+    fi && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir "cmake==3.31.6"
 
