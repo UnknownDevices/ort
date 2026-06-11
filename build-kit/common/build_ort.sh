@@ -20,6 +20,23 @@ if [ ! -d "${SRC_DIR}/.git" ]; then
       https://github.com/microsoft/onnxruntime "${SRC_DIR}"
 fi
 
+# GitLab regenerates archive tarballs (compression changes), so the SHA1s ORT
+# pins in cmake/deps.txt for GitLab-hosted deps (e.g. Eigen) drift and
+# FetchContent aborts. Re-derive them from the served archive — the URL pins a
+# commit, so only packaging changed, not the source.
+deps="${SRC_DIR}/cmake/deps.txt"
+if [ -f "$deps" ]; then
+   grep 'gitlab.com' "$deps" | while IFS=';' read -r dname durl dhash _; do
+      [ -n "$durl" ] || continue
+      curl -fsSL --retry 3 -o /tmp/dep.bin "$durl" || continue
+      dnew="$(sha1sum /tmp/dep.bin | cut -d' ' -f1)"; rm -f /tmp/dep.bin
+      [ "$dnew" = "$dhash" ] && continue
+      echo "deps.txt: ${dname} ${dhash} -> ${dnew}"
+      awk -F';' -v n="$dname" -v h="$dnew" 'BEGIN{OFS=";"} $1==n{$3=h} 1' \
+         "$deps" > "$deps.tmp" && mv "$deps.tmp" "$deps"
+   done
+fi
+
 if [ -n "${CCACHE_DIR:-}" ] && command -v ccache >/dev/null 2>&1; then
    export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 fi

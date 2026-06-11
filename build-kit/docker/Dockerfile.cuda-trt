@@ -6,7 +6,7 @@ ARG ORT_VERSION=v1.22.0
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      git ninja-build ccache patchelf ca-certificates \
+      git ninja-build ccache patchelf ca-certificates curl \
    && rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir "cmake==3.31.6"
