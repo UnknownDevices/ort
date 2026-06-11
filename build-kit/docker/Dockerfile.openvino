@@ -20,9 +20,13 @@ COPY common/build_ort.sh /work/build_ort.sh
 COPY VERSIONS.env /work/VERSIONS.env
 RUN chmod +x /work/build_ort.sh
 
+# GPU = default device, graph partitioning on (unsupported ops fall back to the
+# ORT CPU EP). The app overrides device_type (CPU/NPU/AUTO) at runtime; all
+# plugins load dynamically. Valid build values: CPU|GPU|NPU, *_NO_PARTITION,
+# NPU_NO_CPU_FALLBACK, AUTO:GPU,CPU, MULTI:..., HETERO:... (plain AUTO is invalid).
 ENV ORT_VERSION=${ORT_VERSION} \
     ORT_GROUP=openvino \
-    ORT_EP_FLAGS="--use_openvino AUTO --use_xnnpack"
+    ORT_EP_FLAGS="--use_openvino GPU --use_xnnpack"
 
 WORKDIR /src
 ENTRYPOINT ["bash", "-lc", "source /opt/intel/openvino/setupvars.sh && exec /work/build_ort.sh"]
