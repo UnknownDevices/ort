@@ -53,9 +53,17 @@ EXTRA_ARGS=()
 if [ -n "${ORT_CUDA_ARCHS:-}" ] && { [[ "${ORT_EP_FLAGS}" == *use_cuda* ]] || [[ "${ORT_EP_FLAGS}" == *nv_tensorrt_rtx* ]]; }; then
    EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_CUDA_ARCHITECTURES=${ORT_CUDA_ARCHS}")
 fi
-# Runtime gfx coverage is bounded by the MIOpen/rocBLAS in ROCM_IMAGE.
-if [ -n "${ORT_ROCM_GFX:-}" ] && [[ "${ORT_EP_FLAGS}" == *use_rocm* ]]; then
-   EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_HIP_ARCHITECTURES=${ORT_ROCM_GFX}")
+# nvcc parallelizes the multi-arch compile per file (opt-in; helps the CUDA groups).
+if [ -n "${NVCC_THREADS:-}" ] && { [[ "${ORT_EP_FLAGS}" == *use_cuda* ]] || [[ "${ORT_EP_FLAGS}" == *nv_tensorrt_rtx* ]]; }; then
+   EXTRA_ARGS+=(--nvcc_threads "${NVCC_THREADS}")
+fi
+# ROCm: disable Composable Kernel (fused attention/GEMM — unused by CNN/YOLO
+# inference, an enormous build, and it errors with empty HIP_ARCHITECTURES on
+# the composable_kernel_fmha target). Set the gfx arch list for the remaining
+# HIP targets (runtime coverage bounded by the MIOpen/rocBLAS in ROCM_IMAGE).
+if [[ "${ORT_EP_FLAGS}" == *use_rocm* ]]; then
+   EXTRA_ARGS+=(--cmake_extra_defines onnxruntime_USE_COMPOSABLE_KERNEL=OFF)
+   [ -n "${ORT_ROCM_GFX:-}" ] && EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_HIP_ARCHITECTURES=${ORT_ROCM_GFX}")
 fi
 
 cd "${SRC_DIR}"

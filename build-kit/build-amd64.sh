@@ -14,6 +14,7 @@ mkdir -p out sdk
 
 RUN_FLAGS=(--rm -v "$PWD/out:/out"
    -e NPROC="${NPROC:-$(nproc)}"
+   -e NVCC_THREADS="${NVCC_THREADS:-}"
    -e ORT_ENABLE_LTO="${ORT_ENABLE_LTO:-1}"
    -e ORT_CUDA_ARCHS="${ORT_CUDA_ARCHS}"
    -e ORT_ROCM_GFX="${ORT_ROCM_GFX}")

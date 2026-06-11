@@ -13,6 +13,7 @@ mkdir -p out sdk
 
 RUN_FLAGS=(--rm -v "$PWD/out:/out"
    -e NPROC="${NPROC:-$(nproc)}"
+   -e NVCC_THREADS="${NVCC_THREADS:-}"
    -e ORT_ENABLE_LTO="${ORT_ENABLE_LTO:-1}"
    -e ORT_CUDA_ARCHS="${ORT_CUDA_ARCHS}")
 [ -n "${ORT_EXTRA_FLAGS:-}" ] && RUN_FLAGS+=(-e ORT_EXTRA_FLAGS="${ORT_EXTRA_FLAGS}")
