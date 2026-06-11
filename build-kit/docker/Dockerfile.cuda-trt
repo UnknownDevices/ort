@@ -1,0 +1,23 @@
+# NVIDIA CUDA + TensorRT build. Multi-arch base (amd64 / aarch64).
+ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
+FROM ${NV_TENSORRT_IMAGE}
+
+ARG ORT_VERSION=v1.22.0
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git ninja-build ccache patchelf ca-certificates \
+   && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir "cmake==3.31.6"
+
+COPY common/build_ort.sh /work/build_ort.sh
+COPY VERSIONS.env /work/VERSIONS.env
+RUN chmod +x /work/build_ort.sh
+
+ENV ORT_VERSION=${ORT_VERSION} \
+    ORT_GROUP=cuda-trt \
+    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_tensorrt --tensorrt_home /usr --use_xnnpack"
+
+WORKDIR /src
+ENTRYPOINT ["/work/build_ort.sh"]

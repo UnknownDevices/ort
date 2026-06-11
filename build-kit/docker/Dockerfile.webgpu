@@ -1,0 +1,26 @@
+# WebGPU (Dawn, over Vulkan) build (x86_64). Heavy: ORT builds Dawn from source.
+ARG WEBGPU_IMAGE=ubuntu:22.04
+FROM ${WEBGPU_IMAGE}
+
+ARG ORT_VERSION=v1.22.0
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git python3 python3-pip python3-dev build-essential ninja-build \
+      ccache curl ca-certificates patchelf pkg-config \
+      libvulkan-dev vulkan-tools \
+      libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev \
+   && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir "cmake==3.31.6"
+
+COPY common/build_ort.sh /work/build_ort.sh
+COPY VERSIONS.env /work/VERSIONS.env
+RUN chmod +x /work/build_ort.sh
+
+ENV ORT_VERSION=${ORT_VERSION} \
+    ORT_GROUP=webgpu \
+    ORT_EP_FLAGS="--use_webgpu --use_xnnpack"
+
+WORKDIR /src
+ENTRYPOINT ["/work/build_ort.sh"]

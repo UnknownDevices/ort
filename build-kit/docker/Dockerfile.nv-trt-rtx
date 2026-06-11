@@ -1,0 +1,44 @@
+# NVIDIA NV-TensorRT-RTX build (x86_64). The Linux SDK is auto-downloaded
+# (unauthenticated); a tarball staged in ./sdk/ takes precedence for offline
+# boxes. ORT 1.22 has no --tensorrt_rtx_home, so the SDK is found via the
+# CPATH/LIBRARY_PATH/CMAKE_PREFIX_PATH exported below.
+ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
+FROM ${NV_TENSORRT_IMAGE}
+
+ARG ORT_VERSION=v1.22.0
+ARG TRT_RTX_URL=https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/TensorRT-RTX-1.3.0.35-linux-x86_64-cuda-12.9-Release-external.tar.gz
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      git ninja-build ccache patchelf ca-certificates curl \
+   && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --no-cache-dir "cmake==3.31.6"
+
+COPY sdk /tmp/trt-rtx-sdk
+RUN set -e; \
+    f="$(ls /tmp/trt-rtx-sdk/TensorRT-RTX-*.tar.gz 2>/dev/null | head -1 || true)"; \
+    if [ -z "$f" ]; then \
+       curl -fSL --retry 3 --retry-delay 5 -o /tmp/trt-rtx.tar.gz "${TRT_RTX_URL}"; \
+       f=/tmp/trt-rtx.tar.gz; \
+    fi; \
+    mkdir -p /opt/tensorrt-rtx; \
+    tar -xzf "$f" -C /opt/tensorrt-rtx --strip-components=1; \
+    rm -rf /tmp/trt-rtx-sdk /tmp/trt-rtx.tar.gz; \
+    ls /opt/tensorrt-rtx
+
+ENV CPATH=/opt/tensorrt-rtx/include:${CPATH:-} \
+    LIBRARY_PATH=/opt/tensorrt-rtx/lib:${LIBRARY_PATH:-} \
+    LD_LIBRARY_PATH=/opt/tensorrt-rtx/lib:${LD_LIBRARY_PATH:-} \
+    CMAKE_PREFIX_PATH=/opt/tensorrt-rtx:${CMAKE_PREFIX_PATH:-}
+
+COPY common/build_ort.sh /work/build_ort.sh
+COPY VERSIONS.env /work/VERSIONS.env
+RUN chmod +x /work/build_ort.sh
+
+ENV ORT_VERSION=${ORT_VERSION} \
+    ORT_GROUP=nv-trt-rtx \
+    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_nv_tensorrt_rtx --use_xnnpack"
+
+WORKDIR /src
+ENTRYPOINT ["/work/build_ort.sh"]

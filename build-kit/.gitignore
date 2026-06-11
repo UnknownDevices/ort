@@ -1,0 +1,9 @@
+# Build outputs and caches — never commit compiled libs, ccache, or SDKs.
+/out/*
+!/out/.gitkeep
+/cache/
+# Staged vendor SDK tarballs (gated downloads), but keep the dir + its README.
+/sdk/*
+!/sdk/.gitkeep
+!/sdk/README.md
+*.log
