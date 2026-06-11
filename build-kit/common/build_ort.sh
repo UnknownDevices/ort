@@ -49,6 +49,10 @@ if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]] && ! find /opt/rocm -name 'migraphx
 fi
 
 EXTRA_ARGS=()
+# We ship only the runtime libs — never build the test executables. (--skip_tests
+# only skips RUNNING them; this skips building them, fixing test-only link errors
+# like RegisterCustomOpsAltName and cutting a large chunk of build time.)
+EXTRA_ARGS+=(--cmake_extra_defines onnxruntime_BUILD_UNIT_TESTS=OFF)
 [ "${ORT_ENABLE_LTO:-1}" = "1" ] && EXTRA_ARGS+=(--enable_lto)
 if [ -n "${ORT_CUDA_ARCHS:-}" ] && { [[ "${ORT_EP_FLAGS}" == *use_cuda* ]] || [[ "${ORT_EP_FLAGS}" == *nv_tensorrt_rtx* ]]; }; then
    EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_CUDA_ARCHITECTURES=${ORT_CUDA_ARCHS}")
