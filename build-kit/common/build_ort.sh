@@ -41,6 +41,13 @@ if [ -n "${CCACHE_DIR:-}" ] && command -v ccache >/dev/null 2>&1; then
    export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 fi
 
+# MIGraphX needs its cmake config (migraphx-dev). If it's still not present,
+# drop the EP rather than failing the whole AMD build — ROCm is the primary path.
+if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]] && ! find /opt/rocm -name 'migraphx*onfig.cmake' 2>/dev/null | grep -q .; then
+   echo "WARN: MIGraphX cmake config not found under /opt/rocm; building ROCm-only."
+   ORT_EP_FLAGS="$(echo "${ORT_EP_FLAGS}" | sed -E 's/--use_migraphx//; s#--migraphx_home /opt/rocm##')"
+fi
+
 EXTRA_ARGS=()
 [ "${ORT_ENABLE_LTO:-1}" = "1" ] && EXTRA_ARGS+=(--enable_lto)
 if [ -n "${ORT_CUDA_ARCHS:-}" ] && { [[ "${ORT_EP_FLAGS}" == *use_cuda* ]] || [[ "${ORT_EP_FLAGS}" == *nv_tensorrt_rtx* ]]; }; then
