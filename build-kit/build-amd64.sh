@@ -23,6 +23,13 @@ if [ -n "${CCACHE_DIR_HOST:-}" ]; then
    mkdir -p "${CCACHE_DIR_HOST}"
    RUN_FLAGS+=(-v "$(realpath "${CCACHE_DIR_HOST}"):/ccache" -e CCACHE_DIR=/ccache)
 fi
+# Put the large build trees + compiler temp files on a roomier disk than Docker's data-root:
+# BUILD_STORAGE_DIR is mounted over the container's /tmp, so BUILD_DIR (/tmp/ort-build) and
+# gcc's temp .s files land there. Avoids ENOSPC on the cuda groups when /var/lib/docker is small.
+if [ -n "${BUILD_STORAGE_DIR:-}" ]; then
+   mkdir -p "${BUILD_STORAGE_DIR}"
+   RUN_FLAGS+=(-v "$(realpath "${BUILD_STORAGE_DIR}"):/tmp")
+fi
 
 EXTRA_RUN_ENV=()
 build_group() {
