@@ -2,8 +2,4 @@
 /out/*
 !/out/.gitkeep
 /cache/
-# Staged vendor SDK tarballs (gated downloads), but keep the dir + its README.
-/sdk/*
-!/sdk/.gitkeep
-!/sdk/README.md
 *.log

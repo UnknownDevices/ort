@@ -80,12 +80,22 @@ The Rust side already exists in this fork (`NvTensorRTRTXExecutionProvider`,
 `OrtNvTensorRtRtxProviderOptions`); the kit produces the matching
 `libonnxruntime_providers_nv_tensorrt_rtx.so`.
 
-To switch the app's Linux NVIDIA bundle from regular TensorRT to TensorRT-RTX:
-ship `out/nv-trt-rtx/lib/*` (its `libonnxruntime.so` + the
-`_nv_tensorrt_rtx`/`_shared` providers) **plus the TensorRT-RTX runtime libs**
-(same role as the `tensorrt_rtx_1_3.dll` the Windows path bundles — the Linux
-`.so` equivalents from the staged SDK), and select `NvTensorRTRTXExecutionProvider`
-in the EP factory's Linux NVIDIA branch instead of the regular TensorRT EP.
+**Important — runtime on ORT v1.22:** this provider links the *full* TensorRT
+10.x (`libnvinfer.so.10`), **not** the lightweight TensorRT-RTX runtime
+(`libtensorrt_rtx`). ORT v1.22's `nv_tensorrt_rtx` provider has no support for the
+standalone TensorRT-RTX SDK — that needs ORT ≥ 1.23 (see README). So its runtime
+dependencies are identical to `cuda-trt`'s; confirm with
+`ldd out/nv-trt-rtx/lib/libonnxruntime_providers_nv_tensorrt_rtx.so`.
+
+To use the NV EP for the app's Linux NVIDIA bundle: ship `out/nv-trt-rtx/lib/*`
+(its `libonnxruntime.so` + the `_nv_tensorrt_rtx`/`_shared` providers) **plus the
+same TensorRT 10.x / CUDA / cuDNN runtime libs `cuda-trt` needs**
+(`libnvinfer.so.10`, `libcudart.so.12`, `libcudnn*.so.9`), and select
+`NvTensorRTRTXExecutionProvider` in the EP factory's Linux NVIDIA branch instead
+of the regular TensorRT EP. (For the genuine lightweight TensorRT-RTX runtime —
+the Linux analogue of the Windows `tensorrt_rtx_1_3.dll` path — bump to ORT ≥ 1.23
+first; on v1.22 the NV EP and `cuda-trt` share the same heavy TRT 10.x runtime and
+differ only in the provider implementation.)
 
 ## Optional fork fix: fail loud instead of silent CPU fallback
 

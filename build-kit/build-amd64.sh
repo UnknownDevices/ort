@@ -10,7 +10,7 @@ source ./VERSIONS.env
 : "${ORT_ROCM_GFX:=gfx900;gfx906;gfx1010;gfx1030;gfx1100;gfx1101;gfx1102}"
 
 DOCKER="${DOCKER:-docker}"
-mkdir -p out sdk
+mkdir -p out
 
 RUN_FLAGS=(--rm -v "$PWD/out:/out"
    -e NPROC="${NPROC:-$(nproc)}"
@@ -47,9 +47,7 @@ build_group openvino   Dockerfile.openvino   --build-arg OPENVINO_IMAGE="${OPENV
 EXTRA_RUN_ENV=(-e ORT_ENABLE_LTO="${CUDA_ENABLE_LTO}"
    -e NPROC="${CUDA_NPROC}" -e NVCC_THREADS="${CUDA_NVCC_THREADS}")
 build_group cuda-trt   Dockerfile.cuda-trt   --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}"
-build_group nv-trt-rtx Dockerfile.nv-trt-rtx \
-   --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}" \
-   --build-arg TRT_RTX_URL="${TRT_RTX_URL}"
+build_group nv-trt-rtx Dockerfile.nv-trt-rtx --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}"
 EXTRA_RUN_ENV=()
 
 build_group webgpu     Dockerfile.webgpu     --build-arg WEBGPU_IMAGE="${CPU_IMAGE}"

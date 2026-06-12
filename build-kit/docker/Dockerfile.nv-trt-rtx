@@ -1,19 +1,23 @@
-# NVIDIA NV-TensorRT-RTX build (x86_64). The Linux SDK is auto-downloaded
-# (unauthenticated); a tarball staged in ./sdk/ takes precedence for offline
-# boxes. ORT 1.22 has no RTX-specific home flag, but build.py routes the RTX EP
-# through the same TensorRT validation (use_tensorrt OR use_nv_tensorrt_rtx), so
-# the generic --tensorrt_home is REQUIRED and must point at the extracted SDK
-# (/opt/tensorrt-rtx) -- it also becomes -Donnxruntime_TENSORRT_HOME for cmake.
-# The CPATH/LIBRARY_PATH/CMAKE_PREFIX_PATH exports below back it up at compile/link.
+# NVIDIA "NV TensorRT RTX" execution provider build (x86_64).
+#
+# IMPORTANT: ORT v1.22.0's nv_tensorrt_rtx provider (cmake/onnxruntime_providers_nv.cmake)
+# builds against REGULAR TensorRT 10.x -- it find_library()s nvinfer/nvonnxparser
+# and parses NV_TENSORRT_MAJOR (>=10) from NvInferVersion.h under
+# onnxruntime_TENSORRT_HOME. It has NO support for the standalone TensorRT-RTX SDK
+# (libtensorrt_rtx / the --tensorrt_rtx_home flag); that arrived in a later ORT.
+# So this group links the full TensorRT 10.8 already in the nvcr base image at
+# /usr, exactly like cuda-trt -- the only difference is the (newer) provider
+# source, not the runtime. Shipping the lightweight TensorRT-RTX runtime instead
+# would require bumping ORT to >=1.23 (and the fork's C-API ABI off ms@1.22.0).
 ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
 FROM ${NV_TENSORRT_IMAGE}
 
 ARG ORT_VERSION=v1.22.0
-ARG TRT_RTX_URL=https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/TensorRT-RTX-1.3.0.35-linux-x86_64-cuda-12.9-Release-external.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Clean authenticated install first; fall back to tolerant flags if the image's
-# CUDA apt repo has a stale key / Release.
+# CUDA apt repo has a stale key / Release. (curl is used by build_ort.sh's
+# GitLab dep-hash self-heal.)
 RUN PKGS="git ninja-build ccache patchelf ca-certificates curl"; \
     if ! { apt-get update && apt-get install -y --no-install-recommends $PKGS; }; then \
        apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::AllowInsecureRepositories=true && \
@@ -22,30 +26,13 @@ RUN PKGS="git ninja-build ccache patchelf ca-certificates curl"; \
 
 RUN pip3 install --no-cache-dir "cmake==3.31.6"
 
-COPY sdk /tmp/trt-rtx-sdk
-RUN set -e; \
-    f="$(ls /tmp/trt-rtx-sdk/TensorRT-RTX-*.tar.gz 2>/dev/null | head -1 || true)"; \
-    if [ -z "$f" ]; then \
-       curl -fSL --retry 3 --retry-delay 5 -o /tmp/trt-rtx.tar.gz "${TRT_RTX_URL}"; \
-       f=/tmp/trt-rtx.tar.gz; \
-    fi; \
-    mkdir -p /opt/tensorrt-rtx; \
-    tar -xzf "$f" -C /opt/tensorrt-rtx --strip-components=1; \
-    rm -rf /tmp/trt-rtx-sdk /tmp/trt-rtx.tar.gz; \
-    ls /opt/tensorrt-rtx
-
-ENV CPATH=/opt/tensorrt-rtx/include:${CPATH:-} \
-    LIBRARY_PATH=/opt/tensorrt-rtx/lib:${LIBRARY_PATH:-} \
-    LD_LIBRARY_PATH=/opt/tensorrt-rtx/lib:${LD_LIBRARY_PATH:-} \
-    CMAKE_PREFIX_PATH=/opt/tensorrt-rtx:${CMAKE_PREFIX_PATH:-}
-
 COPY common/build_ort.sh /work/build_ort.sh
 COPY VERSIONS.env /work/VERSIONS.env
 RUN chmod +x /work/build_ort.sh
 
 ENV ORT_VERSION=${ORT_VERSION} \
     ORT_GROUP=nv-trt-rtx \
-    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_nv_tensorrt_rtx --tensorrt_home /opt/tensorrt-rtx --use_xnnpack"
+    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_nv_tensorrt_rtx --tensorrt_home /usr --use_xnnpack"
 
 WORKDIR /src
 ENTRYPOINT ["/work/build_ort.sh"]

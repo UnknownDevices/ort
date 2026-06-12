@@ -8,8 +8,9 @@ One pass per box builds **everything that box's targets can use**, with full
 optimization. Runs entirely in Docker so the hosts stay clean.
 
 > Pinned to ONNX Runtime **v1.22.0** (matches this fork's C-API ABI —
-> `ort-sys/dist.txt` → `ms@1.22.0`). Verified that v1.22.0 carries the
-> NV-TensorRT-RTX EP. Do not bump without bumping the fork.
+> `ort-sys/dist.txt` → `ms@1.22.0`). v1.22.0 carries the NV-TensorRT-RTX EP, but
+> it builds against full TensorRT 10.x — the lightweight TensorRT-RTX runtime
+> (`libtensorrt_rtx`) needs ORT ≥ 1.23. Do not bump without bumping the fork.
 
 ## What gets built
 
@@ -19,7 +20,7 @@ optimization. Runs entirely in Docker so the hosts stay clean.
 | `rocm` | ROCm + MIGraphX + XNNPACK | ✅ | — | AMD; arm box has no ROCm SDK / market |
 | `openvino` | OpenVINO + XNNPACK | ✅ | — | Intel GPU/NPU/CPU |
 | `cuda-trt` | CUDA + TensorRT + XNNPACK | ✅ | ✅ | arm64 fills the missing aarch64 cu12 |
-| `nv-trt-rtx` | CUDA + NV-TensorRT-RTX + XNNPACK | ✅ | — | consumer RTX (x86_64 only); SDK auto-downloaded |
+| `nv-trt-rtx` | CUDA + NV-TensorRT-RTX + XNNPACK | ✅ | — | consumer RTX (x86_64 only); on v1.22 links full TensorRT 10.x, not the RTX SDK |
 | `webgpu` | WebGPU (Dawn, over Vulkan) + XNNPACK | ✅ | — | cross-vendor GPU; heavy Dawn build; zero-copy interop unproven |
 
 `x86_64` → `./build-amd64.sh` · `arm64` → `./build-arm64.sh`. Each build emits
@@ -62,15 +63,14 @@ Windows DirectML+TRT-RTX (already shipping off prebuilts), Android QNN (NDK).
   ~200 GB. On less, lower `CUDA_NPROC` / `CUDA_NVCC_THREADS`.
 - NVIDIA base pulls anonymously from `nvcr.io` (verified — no NGC login needed).
 - **No manual downloads.** Every dependency is fetched by the build: base images
-  (anonymous), the ONNX Runtime source + its cmake deps, and the Linux
-  TensorRT-RTX SDK for `nv-trt-rtx` (auto-downloaded from `TRT_RTX_URL`,
-  unauthenticated). `./sdk/` is only for air-gapped boxes (see `sdk/README.md`).
+  (anonymous) and the ONNX Runtime source + its cmake deps. The NVIDIA groups link
+  the TensorRT 10.x already inside the `nvcr` base image — no extra SDK to stage.
 - A GPU is **not** required to *build* any of this.
 
 ## Run it
 
 ```bash
-# x86_64 big-CPU box  (downloads everything it needs, incl. the TRT-RTX SDK)
+# x86_64 big-CPU box  (downloads what it needs: base images, ORT source + deps)
 cd build-kit && ./build-amd64.sh
 
 # arm64 NVIDIA DGX
@@ -88,36 +88,35 @@ CUDA_NPROC=96 CUDA_NVCC_THREADS=2 ./build-amd64.sh      # more RAM -> push NVIDI
 CUDA_ENABLE_LTO=1 ./build-amd64.sh                      # re-enable CUDA LTO (slow, single-core link)
 ```
 
-## Three NVIDIA version knobs to confirm on the box
+## Two NVIDIA version knobs to confirm on the box
 
 These are the only values I can't pin without the hardware/portal — align them
 once in `VERSIONS.env` and everything else follows:
 
-1. **`NV_TENSORRT_IMAGE`** — its CUDA minor sets your max GPU arch. Default
-   `25.01-py3` = CUDA 12.8 (covers Blackwell). Check:
+1. **`NV_TENSORRT_IMAGE`** — its CUDA minor sets your max GPU arch, and it supplies
+   the TensorRT 10.x that *both* NVIDIA groups link against. Default `25.01-py3` =
+   CUDA 12.8 + TRT 10.8 (covers Blackwell). Check:
    `docker run --rm <img> cat /usr/local/cuda/version.json`.
-2. **`TRT_RTX_URL`** — auto-downloaded SDK (default `1.3.0.35`, the version the
-   Windows app ships). Its CUDA suffix (12.9) should match the image's CUDA minor.
-3. **`ROCM_IMAGE` / `OPENVINO_IMAGE` versions** — the provider `.so` links these
+2. **`ROCM_IMAGE` / `OPENVINO_IMAGE` versions** — the provider `.so` links these
    ABIs, so the app must bundle the **same-major** vendor runtime libs:
 
 | Group | Built against | App bundles (same major) |
 |---|---|---|
 | `rocm` | ROCm 6.x | `libamdhip64.so.6`, `librocblas.so.4`, `libMIOpen.so.1`, `libmigraphx*.so` |
 | `openvino` | OpenVINO 2024.x | `libopenvino.so.2024`, plugin `.so`s |
-| `cuda-trt` / `nv-trt-rtx` | CUDA 12.x / TRT 10.x / TRT-RTX 1.3 | `libcudart.so.12`, `libcudnn*.so.9`, `libnvinfer.so.10`, TRT-RTX runtime |
+| `cuda-trt` / `nv-trt-rtx` | CUDA 12.x / TRT 10.x | `libcudart.so.12`, `libcudnn*.so.9`, `libnvinfer.so.10` (both groups link full TRT 10.x on v1.22) |
 
 Cross-check sonames in each `MANIFEST.txt` against what `bundle_appimage.sh` ships.
 
 ## Troubleshooting
 
 - **CMake too old** — handled (`pip install cmake==3.31.6`; ORT 1.22 needs ≥ 3.28).
-- **`nv-trt-rtx` SDK download fails** (offline/proxy box) — drop the tarball in
-  `./sdk/` and it's used instead of downloading. See `sdk/README.md`.
-- **NV-TRT-RTX can't find the SDK at configure** — ORT 1.22 has no
-  `--tensorrt_rtx_home`; the Dockerfile exports `CPATH`/`LIBRARY_PATH`/
-  `CMAKE_PREFIX_PATH` to `/opt/tensorrt-rtx`. If a define is still needed, add it
-  via `ORT_EXTRA_FLAGS="--cmake_extra_defines ..."`.
+- **`nv-trt-rtx` configure: "tensorrt_home … must be specified" or "Only TensorRT
+  10.x or higher is supported"** — on v1.22 the NV provider builds against the base
+  image's regular TensorRT 10.x (`--tensorrt_home /usr`), *not* the standalone
+  TensorRT-RTX SDK (its `libtensorrt_rtx` / `--tensorrt_rtx_home` need ORT ≥ 1.23).
+  Don't point this group at an RTX-SDK dir — on `CMAKE_PREFIX_PATH` it hijacks
+  cmake's `NvInfer.h` probe and the `NV_TENSORRT_MAJOR` version parse fails.
 - **ROCm EP is version-sensitive** — if it trips, match `ROCM_IMAGE` to a ROCm
   the ORT release is happy with, or add `--rocm_version 6.2` via `ORT_EXTRA_FLAGS`.
 - **OpenVINO device flag** — built with `--use_openvino AUTO`; app picks the real

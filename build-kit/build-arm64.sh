@@ -9,7 +9,7 @@ source ./VERSIONS.env
 : "${ORT_CUDA_ARCHS:=72-real;87-real;90-real;90-virtual}"
 
 DOCKER="${DOCKER:-docker}"
-mkdir -p out sdk
+mkdir -p out
 
 RUN_FLAGS=(--rm -v "$PWD/out:/out"
    -e NPROC="${NPROC:-$(nproc)}"
