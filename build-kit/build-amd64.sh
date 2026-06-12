@@ -39,7 +39,9 @@ EXTRA_RUN_ENV=(-e ORT_EP_FLAGS="--use_xnnpack --use_dnnl")
 build_group cpu        Dockerfile.cpu        --build-arg CPU_IMAGE="${CPU_IMAGE}"
 EXTRA_RUN_ENV=()
 
-build_group rocm       Dockerfile.rocm       --build-arg ROCM_IMAGE="${ROCM_IMAGE}"
+# ROCm stays on ORT 1.22: the ROCm EP was deleted in 1.23 (MIGraphX-only there). Per-vendor
+# bundles are independent, so AMD keeps the ROCm EP while the other groups move to 1.23.2.
+ORT_VERSION="${ROCM_ORT_VERSION}" build_group rocm Dockerfile.rocm --build-arg ROCM_IMAGE="${ROCM_IMAGE}"
 build_group openvino   Dockerfile.openvino   --build-arg OPENVINO_IMAGE="${OPENVINO_IMAGE}"
 
 # NVIDIA groups: device-LTO off + bounded parallelism (see VERSIONS.env). These

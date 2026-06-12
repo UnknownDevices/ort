@@ -63,7 +63,7 @@ The app's `bundle_appimage.sh` already copies vendor runtime libs into
    `.so`s into the dir it harvests from) so the **base `libonnxruntime.so` and
    the provider `.so`s** land in `usr/lib`.
 2. Keep the existing vendor-runtime bundling (ROCm `.so.6/.4/.1`, OpenVINO
-   `.so.2024`, CUDA/cuDNN/TRT) — those are the libs the provider `.so` depends
+   `.so.2510`, CUDA/cuDNN/TRT) — those are the libs the provider `.so` depends
    on. **Their major versions must match the base image this kit built
    against** (see README → "Version coupling"). Cross-check `MANIFEST.txt`.
 3. For ROCm also ship the MIGraphX runtime (`libmigraphx*.so`) since the kit

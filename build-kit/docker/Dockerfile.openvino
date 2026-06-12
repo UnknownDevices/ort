@@ -1,5 +1,5 @@
 # Intel OpenVINO build (x86_64).
-ARG OPENVINO_IMAGE=openvino/ubuntu22_dev:2024.6.0
+ARG OPENVINO_IMAGE=openvino/ubuntu22_dev:2025.1.0
 FROM ${OPENVINO_IMAGE}
 USER root
 

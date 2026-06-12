@@ -12,13 +12,17 @@ optimization. Runs entirely in Docker so the hosts stay clean.
 > bindings link fine against the 1.23.2 runtime built here. 1.23.2 is the floor for the
 > `nv-trt-rtx` provider to link the lightweight TensorRT-RTX SDK (`libtensorrt_rtx`)
 > instead of full TensorRT.
+>
+> **Exception — `rocm` stays on `v1.22.0`** (`ROCM_ORT_VERSION`): ONNX Runtime removed the
+> ROCm EP in 1.23 (MIGraphX-only), so AMD keeps the ROCm EP at its last version. Bundles are
+> per-vendor, so the mixed ORT versions never meet.
 
 ## What gets built
 
 | Group | EPs in the build | x86_64 box | arm64 DGX | Notes |
 |---|---|:--:|:--:|---|
 | `cpu` | XNNPACK + oneDNN (x86) / +KleidiAI (arm) | ✅ | ✅ | dependency-light no-GPU fallback; oneDNN is x86-only |
-| `rocm` | ROCm + MIGraphX + XNNPACK | ✅ | — | AMD; arm box has no ROCm SDK / market |
+| `rocm` | ROCm + MIGraphX + XNNPACK | ✅ | — | AMD; **pinned to ORT 1.22** (ROCm EP deleted in 1.23); arm box has no ROCm SDK |
 | `openvino` | OpenVINO + XNNPACK | ✅ | — | Intel GPU/NPU/CPU |
 | `cuda-trt` | CUDA + TensorRT + XNNPACK | ✅ | ✅ | arm64 fills the missing aarch64 cu12 |
 | `nv-trt-rtx` | CUDA + NV-TensorRT-RTX + XNNPACK | ✅ | — | consumer RTX (x86_64 only); links the TensorRT-RTX SDK — vendor the SDK tarball into `vendor/` (see below) |
@@ -106,7 +110,7 @@ once in `VERSIONS.env` and everything else follows:
 | Group | Built against | App bundles (same major) |
 |---|---|---|
 | `rocm` | ROCm 6.x | `libamdhip64.so.6`, `librocblas.so.4`, `libMIOpen.so.1`, `libmigraphx*.so` |
-| `openvino` | OpenVINO 2024.x | `libopenvino.so.2024`, plugin `.so`s |
+| `openvino` | OpenVINO 2025.x | `libopenvino.so.2510`, plugin `.so`s |
 | `cuda-trt` | CUDA 12.9 / full TRT 10.11 | `libcudart.so.12`, `libcudnn*.so.9`, `libnvinfer.so.10` |
 | `nv-trt-rtx` | CUDA 12.9 / TensorRT-RTX 1.3 | `libcudart.so.12`, `libcudnn*.so.9`, `libtensorrt_rtx.so.1` (lightweight RTX runtime, like the Windows `tensorrt_rtx_1_3.dll`) |
 
