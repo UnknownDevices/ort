@@ -1,7 +1,10 @@
 # NVIDIA NV-TensorRT-RTX build (x86_64). The Linux SDK is auto-downloaded
 # (unauthenticated); a tarball staged in ./sdk/ takes precedence for offline
-# boxes. ORT 1.22 has no --tensorrt_rtx_home, so the SDK is found via the
-# CPATH/LIBRARY_PATH/CMAKE_PREFIX_PATH exported below.
+# boxes. ORT 1.22 has no RTX-specific home flag, but build.py routes the RTX EP
+# through the same TensorRT validation (use_tensorrt OR use_nv_tensorrt_rtx), so
+# the generic --tensorrt_home is REQUIRED and must point at the extracted SDK
+# (/opt/tensorrt-rtx) -- it also becomes -Donnxruntime_TENSORRT_HOME for cmake.
+# The CPATH/LIBRARY_PATH/CMAKE_PREFIX_PATH exports below back it up at compile/link.
 ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
 FROM ${NV_TENSORRT_IMAGE}
 
@@ -42,7 +45,7 @@ RUN chmod +x /work/build_ort.sh
 
 ENV ORT_VERSION=${ORT_VERSION} \
     ORT_GROUP=nv-trt-rtx \
-    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_nv_tensorrt_rtx --use_xnnpack"
+    ORT_EP_FLAGS="--use_cuda --cuda_home /usr/local/cuda --cudnn_home /usr --use_nv_tensorrt_rtx --tensorrt_home /opt/tensorrt-rtx --use_xnnpack"
 
 WORKDIR /src
 ENTRYPOINT ["/work/build_ort.sh"]
