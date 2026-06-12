@@ -38,7 +38,12 @@ if [ -f "$deps" ]; then
 fi
 
 if [ -n "${CCACHE_DIR:-}" ] && command -v ccache >/dev/null 2>&1; then
-   export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
+   # Cache nvcc too, not just host C/C++ -- the CUDA objects are the bulk of a
+   # re-run's cost. Bump max_size well past the 5G default so the multi-arch CUDA
+   # objects don't evict each other across groups / re-runs.
+   export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+          CMAKE_CUDA_COMPILER_LAUNCHER=ccache
+   export CCACHE_MAXSIZE="${CCACHE_MAXSIZE:-50G}"
 fi
 
 # MIGraphX needs its cmake config (migraphx-dev). If it's still not present,

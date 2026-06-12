@@ -31,13 +31,22 @@ Windows DirectML+TRT-RTX (already shipping off prebuilts), Android QNN (NDK).
 
 ## Optimizations applied
 
-- **`--enable_lto`** on every build (`ORT_ENABLE_LTO=1`).
+- **`--enable_lto`** on the CPU/ROCm/OpenVINO/WebGPU groups (`ORT_ENABLE_LTO=1`).
+  **Off for the NVIDIA groups** (`CUDA_ENABLE_LTO=0`): CUDA device-LTO defers all
+  per-arch `ptxas` codegen into a single, non-parallel `nvlink`, which serializes
+  the whole 8-arch build onto one core (the multi-hour grind) and is the OOM
+  source. With it off, the codegen fans out across every core instead.
 - **Full CUDA arch coverage**, native SASS per generation + PTX for forward
   compat. x86_64: Turing→Blackwell (`75;80;86;89;90;100;120` + PTX); arm64:
   Xavier/Orin/Grace-Hopper (`72;87;90` + PTX). Hence the CUDA 12.8+ base image
-  (Blackwell sm_120 = RTX 50 needs CUDA ≥ 12.8).
+  (Blackwell sm_120 = RTX 50 needs CUDA ≥ 12.8). Breadth is cheap in wall-clock
+  now that LTO no longer serializes it — the only cost is a bigger shipped fatbin.
+- **Bounded CUDA parallelism** — the NVIDIA groups run `CUDA_NPROC=64
+  CUDA_NVCC_THREADS=2` instead of all-cores, because the 8-arch `ptxas` passes
+  spike memory (~`NPROC*NVCC_THREADS` concurrent `ptxas` at ~2-5 GB each). Tuned
+  for ~200 GB RAM; raise `CUDA_NPROC` after watching peak RSS.
 - **XNNPACK in every group** (KleidiAI auto-links on aarch64) for a fast CPU path.
-- **Release** config, parallel to all cores.
+- **Release** config; non-CUDA groups parallel to all cores.
 - **No `-march=native`** — deliberate. ORT's MLAS kernels are runtime-dispatched
   (AVX2/AVX512/NEON), so a generic build is already optimal *and* portable to
   end users' CPUs; pinning `-march` would bind to the build box.
@@ -45,9 +54,12 @@ Windows DirectML+TRT-RTX (already shipping off prebuilts), Android QNN (NDK).
 ## Prerequisites
 
 - Docker with internet (pulls vendor base images; build fetches ORT source + deps).
-- **Disk:** ~30–50 GB per group (LTO + many CUDA arches make the CUDA groups the
-  heaviest). **Time:** broad-arch CUDA + LTO is long — that's the trade for one
-  comprehensive pass; set `CCACHE_DIR_HOST` if you'll re-run.
+- **Disk:** ~30–50 GB per group (many CUDA arches make the CUDA groups the
+  heaviest). **Time:** the broad-arch CUDA build is large but now fans out across
+  all cores (device-LTO off); `ccache` is on by default (`CCACHE_DIR_HOST=cache/
+  ccache`, 50 GB cap) so a re-run after a failure skips the bulk of it.
+- **RAM:** the NVIDIA groups are memory-bound, not core-bound — defaults assume
+  ~200 GB. On less, lower `CUDA_NPROC` / `CUDA_NVCC_THREADS`.
 - NVIDIA base pulls anonymously from `nvcr.io` (verified — no NGC login needed).
 - **No manual downloads.** Every dependency is fetched by the build: base images
   (anonymous), the ONNX Runtime source + its cmake deps, and the Linux
@@ -72,6 +84,8 @@ Common overrides (or edit `VERSIONS.env`):
 ```bash
 NPROC=96 CCACHE_DIR_HOST=./cache/ccache ./build-amd64.sh
 ORT_CUDA_ARCHS="90-real;90-virtual" ./build-arm64.sh   # narrow to just GH200
+CUDA_NPROC=96 CUDA_NVCC_THREADS=2 ./build-amd64.sh      # more RAM -> push NVIDIA groups harder
+CUDA_ENABLE_LTO=1 ./build-amd64.sh                      # re-enable CUDA LTO (slow, single-core link)
 ```
 
 ## Three NVIDIA version knobs to confirm on the box

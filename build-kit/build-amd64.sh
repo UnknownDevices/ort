@@ -41,10 +41,17 @@ EXTRA_RUN_ENV=()
 
 build_group rocm       Dockerfile.rocm       --build-arg ROCM_IMAGE="${ROCM_IMAGE}"
 build_group openvino   Dockerfile.openvino   --build-arg OPENVINO_IMAGE="${OPENVINO_IMAGE}"
+
+# NVIDIA groups: device-LTO off + bounded parallelism (see VERSIONS.env). These
+# -e flags follow RUN_FLAGS on the `docker run` line, so they override the globals.
+EXTRA_RUN_ENV=(-e ORT_ENABLE_LTO="${CUDA_ENABLE_LTO}"
+   -e NPROC="${CUDA_NPROC}" -e NVCC_THREADS="${CUDA_NVCC_THREADS}")
 build_group cuda-trt   Dockerfile.cuda-trt   --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}"
 build_group nv-trt-rtx Dockerfile.nv-trt-rtx \
    --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}" \
    --build-arg TRT_RTX_URL="${TRT_RTX_URL}"
+EXTRA_RUN_ENV=()
+
 build_group webgpu     Dockerfile.webgpu     --build-arg WEBGPU_IMAGE="${CPU_IMAGE}"
 
 echo; echo "amd64 builds complete -> ./out/"
