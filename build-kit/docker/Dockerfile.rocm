@@ -2,7 +2,7 @@
 ARG ROCM_IMAGE=rocm/dev-ubuntu-22.04:6.2.4-complete
 FROM ${ROCM_IMAGE}
 
-ARG ORT_VERSION=v1.22.0
+ARG ORT_VERSION=v1.23.2
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Ubuntu build tools plus migraphx-dev: the -complete image ships

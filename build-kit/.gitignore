@@ -3,3 +3,7 @@
 !/out/.gitkeep
 /cache/
 *.log
+
+# Vendored SDKs (e.g. the auth-gated TensorRT-RTX tarball for nv-trt-rtx).
+/vendor/*
+!/vendor/README.md

@@ -3,7 +3,7 @@ ARG OPENVINO_IMAGE=openvino/ubuntu22_dev:2024.6.0
 FROM ${OPENVINO_IMAGE}
 USER root
 
-ARG ORT_VERSION=v1.22.0
+ARG ORT_VERSION=v1.23.2
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Clean authenticated install first; fall back to tolerant flags if the image's
