@@ -128,11 +128,12 @@ Cross-check sonames in each `MANIFEST.txt` against what `bundle_appimage.sh` shi
   the ORT release is happy with, or add `--rocm_version 6.2` via `ORT_EXTRA_FLAGS`.
 - **OpenVINO device flag** — built with `--use_openvino AUTO`; app picks the real
   device at runtime. If `AUTO` is rejected, edit `docker/Dockerfile.openvino`.
-- **OpenVINO build: `fatal error: format: No such file or directory`** — ORT 1.23's
-  OpenVINO EP compiles at C++20 and uses `<format>`, which libstdc++ ships only from GCC
-  13+. The ubuntu22 OpenVINO image has GCC 11, so `Dockerfile.openvino` adds GCC 13 (the
-  `ubuntu-toolchain-r/test` PPA) and sets `CC`/`CXX`. Consequence: the Intel AppImage must
-  also bundle GCC 13's `libstdc++.so.6` (the EP needs `GLIBCXX_3.4.32` from `<format>`).
+- **OpenVINO build: `<format>: No such file or directory`, or MLAS `no such instruction:
+  vcvtneeph2ps`** — ORT 1.23's OpenVINO EP needs GCC 13+ (C++20 `<format>`) *and* binutils
+  ≥ 2.40 (MLAS's AVX-NE-CONVERT path that GCC 13 enables). Ubuntu 22.04 (GCC 11 / binutils
+  2.38) can't do either, so this group runs on `openvino/ubuntu24_dev` (GCC 13 + binutils
+  2.42). Consequences: the Intel bundle's glibc floor is **2.39** (vs 2.35 elsewhere), and
+  the Intel AppImage must also ship GCC 13's `libstdc++.so.6` (`GLIBCXX_3.4.32`).
 - **LTO trips a group** — set `ORT_ENABLE_LTO=0` to drop it for that run.
 
 See `INTEGRATION.md` for how the app links/loads and ships these libs.
