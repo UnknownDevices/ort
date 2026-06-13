@@ -134,6 +134,9 @@ Cross-check sonames in each `MANIFEST.txt` against what `bundle_appimage.sh` shi
   2.38) can't do either, so this group runs on `openvino/ubuntu24_dev` (GCC 13 + binutils
   2.42). Consequences: the Intel bundle's glibc floor is **2.39** (vs 2.35 elsewhere), and
   the Intel AppImage must also ship GCC 13's `libstdc++.so.6` (`GLIBCXX_3.4.32`).
+- **WebGPU configure: `Could not find NODE_EXECUTABLE`** — ORT 1.23's WebGPU EP runs Node.js
+  at configure time for WGSL template codegen. `Dockerfile.webgpu` installs Node 20
+  (NodeSource); Ubuntu 22.04's apt `nodejs` is EOL 12.x.
 - **LTO trips a group** — set `ORT_ENABLE_LTO=0` to drop it for that run.
 
 See `INTEGRATION.md` for how the app links/loads and ships these libs.
