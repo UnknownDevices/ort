@@ -10,7 +10,7 @@ source ./VERSIONS.env
 : "${ORT_ROCM_GFX:=gfx906;gfx1010;gfx1030;gfx1100;gfx1101;gfx1102;gfx1151;gfx1200;gfx1201}"
 
 DOCKER="${DOCKER:-docker}"
-mkdir -p out sdk
+mkdir -p out
 
 RUN_FLAGS=(--rm -v "$PWD/out:/out"
    -e NPROC="${NPROC:-$(nproc)}"
@@ -22,6 +22,13 @@ RUN_FLAGS=(--rm -v "$PWD/out:/out"
 if [ -n "${CCACHE_DIR_HOST:-}" ]; then
    mkdir -p "${CCACHE_DIR_HOST}"
    RUN_FLAGS+=(-v "$(realpath "${CCACHE_DIR_HOST}"):/ccache" -e CCACHE_DIR=/ccache)
+fi
+# Put the large build trees + compiler temp files on a roomier disk than Docker's data-root:
+# BUILD_STORAGE_DIR is mounted over the container's /tmp, so BUILD_DIR (/tmp/ort-build) and
+# gcc's temp .s files land there. Avoids ENOSPC on the cuda groups when /var/lib/docker is small.
+if [ -n "${BUILD_STORAGE_DIR:-}" ]; then
+   mkdir -p "${BUILD_STORAGE_DIR}"
+   RUN_FLAGS+=(-v "$(realpath "${BUILD_STORAGE_DIR}"):/tmp")
 fi
 
 EXTRA_RUN_ENV=()
@@ -39,12 +46,18 @@ EXTRA_RUN_ENV=(-e ORT_EP_FLAGS="--use_xnnpack --use_dnnl")
 build_group cpu        Dockerfile.cpu        --build-arg CPU_IMAGE="${CPU_IMAGE}"
 EXTRA_RUN_ENV=()
 
+# AMD is MIGraphX-only on 1.23.2 (the ROCm EP was deleted in 1.23); ROCm 7.x reaches RDNA4.
 build_group rocm       Dockerfile.rocm       --build-arg ROCM_IMAGE="${ROCM_IMAGE}"
 build_group openvino   Dockerfile.openvino   --build-arg OPENVINO_IMAGE="${OPENVINO_IMAGE}"
+
+# NVIDIA groups: device-LTO off + bounded parallelism (see VERSIONS.env). These
+# -e flags follow RUN_FLAGS on the `docker run` line, so they override the globals.
+EXTRA_RUN_ENV=(-e ORT_ENABLE_LTO="${CUDA_ENABLE_LTO}"
+   -e NPROC="${CUDA_NPROC}" -e NVCC_THREADS="${CUDA_NVCC_THREADS}")
 build_group cuda-trt   Dockerfile.cuda-trt   --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}"
-build_group nv-trt-rtx Dockerfile.nv-trt-rtx \
-   --build-arg NV_TENSORRT_IMAGE="${NV_TENSORRT_IMAGE}" \
-   --build-arg TRT_RTX_URL="${TRT_RTX_URL}"
+build_group nv-trt-rtx Dockerfile.nv-trt-rtx --build-arg NV_RTX_CUDA_IMAGE="${NV_RTX_CUDA_IMAGE}" --build-arg TENSORRT_RTX_VERSION="${TENSORRT_RTX_VERSION}"
+EXTRA_RUN_ENV=()
+
 build_group webgpu     Dockerfile.webgpu     --build-arg WEBGPU_IMAGE="${CPU_IMAGE}"
 
 echo; echo "amd64 builds complete -> ./out/"

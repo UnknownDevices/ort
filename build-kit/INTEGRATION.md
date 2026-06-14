@@ -63,7 +63,7 @@ The app's `bundle_appimage.sh` already copies vendor runtime libs into
    `.so`s into the dir it harvests from) so the **base `libonnxruntime.so` and
    the provider `.so`s** land in `usr/lib`.
 2. Keep the existing vendor-runtime bundling (ROCm `.so.6/.4/.1`, OpenVINO
-   `.so.2024`, CUDA/cuDNN/TRT) — those are the libs the provider `.so` depends
+   `.so.2510`, CUDA/cuDNN/TRT) — those are the libs the provider `.so` depends
    on. **Their major versions must match the base image this kit built
    against** (see README → "Version coupling"). Cross-check `MANIFEST.txt`.
 3. For ROCm also ship the MIGraphX runtime (`libmigraphx*.so`) since the kit
@@ -80,12 +80,19 @@ The Rust side already exists in this fork (`NvTensorRTRTXExecutionProvider`,
 `OrtNvTensorRtRtxProviderOptions`); the kit produces the matching
 `libonnxruntime_providers_nv_tensorrt_rtx.so`.
 
-To switch the app's Linux NVIDIA bundle from regular TensorRT to TensorRT-RTX:
-ship `out/nv-trt-rtx/lib/*` (its `libonnxruntime.so` + the
-`_nv_tensorrt_rtx`/`_shared` providers) **plus the TensorRT-RTX runtime libs**
-(same role as the `tensorrt_rtx_1_3.dll` the Windows path bundles — the Linux
-`.so` equivalents from the staged SDK), and select `NvTensorRTRTXExecutionProvider`
-in the EP factory's Linux NVIDIA branch instead of the regular TensorRT EP.
+**Runtime (ORT 1.23.2):** this provider links the lightweight **TensorRT-RTX SDK**
+(`libtensorrt_rtx.so.1`), **not** full TensorRT — the Linux analogue of the Windows
+`tensorrt_rtx_1_3.dll` path. The SDK is vendored into `build-kit/vendor/` and built via
+`--tensorrt_rtx_home` (see `Dockerfile.nv-trt-rtx`). Confirm with
+`ldd out/nv-trt-rtx/lib/libonnxruntime_providers_nv_tensorrt_rtx.so` — it should show
+`libtensorrt_rtx`, not `libnvinfer`.
+
+To use the NV EP for the app's Linux NVIDIA bundle: ship `out/nv-trt-rtx/lib/*`
+(its `libonnxruntime.so` + the `_nv_tensorrt_rtx`/`_shared` providers) **plus the
+TensorRT-RTX runtime + CUDA / cuDNN libs** (`libtensorrt_rtx.so.1`, `libcudart.so.12`,
+`libcudnn*.so.9`), and select `NvTensorRTRTXExecutionProvider` in the EP factory's Linux
+NVIDIA branch instead of the regular TensorRT EP. The `libtensorrt_rtx` runtime is **not**
+harvested into `out/` — bundle it from the vendored SDK, exactly like the Windows DLL.
 
 ## Optional fork fix: fail loud instead of silent CPU fallback
 

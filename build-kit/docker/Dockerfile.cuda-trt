@@ -1,5 +1,5 @@
 # NVIDIA CUDA + TensorRT build. Multi-arch base (amd64 / aarch64).
-ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
+ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.06-py3
 FROM ${NV_TENSORRT_IMAGE}
 
 ARG ORT_VERSION=v1.23.2

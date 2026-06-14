@@ -2,8 +2,8 @@
 /out/*
 !/out/.gitkeep
 /cache/
-# Staged vendor SDK tarballs (gated downloads), but keep the dir + its README.
-/sdk/*
-!/sdk/.gitkeep
-!/sdk/README.md
 *.log
+
+# Vendored SDKs (e.g. the auth-gated TensorRT-RTX tarball for nv-trt-rtx).
+/vendor/*
+!/vendor/README.md

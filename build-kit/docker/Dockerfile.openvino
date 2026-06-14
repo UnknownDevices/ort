@@ -1,5 +1,14 @@
 # Intel OpenVINO build (x86_64).
-ARG OPENVINO_IMAGE=openvino/ubuntu22_dev:2024.6.0
+#
+# Uses the ubuntu24 OpenVINO image, NOT ubuntu22. ORT 1.23's OpenVINO EP needs two things
+# Ubuntu 22.04 can't give at once:
+#   - C++20 <format> (ov_factory.cc / ov_interface.cc) -> needs GCC 13+ (22.04 has GCC 11).
+#   - MLAS cvtfp16Avx.S uses AVX-NE-CONVERT (vcvtneeph2ps) -> needs binutils >= 2.40 to
+#     assemble (22.04 has binutils 2.38; GCC 13 enables this MLAS path).
+# Ubuntu 24.04 ships GCC 13 + binutils 2.42 by default, satisfying both. Trade-off: this is
+# the only group on 24.04, so the Intel bundle's glibc floor is 2.39 (vs 2.35 elsewhere), and
+# the Intel AppImage must ship GCC 13's libstdc++.so.6.
+ARG OPENVINO_IMAGE=openvino/ubuntu24_dev:2025.1.0
 FROM ${OPENVINO_IMAGE}
 USER root
 
@@ -14,7 +23,9 @@ RUN PKGS="git python3 python3-pip python3-dev build-essential ninja-build ccache
        apt-get install -y --no-install-recommends --allow-unauthenticated $PKGS; \
     fi && rm -rf /var/lib/apt/lists/*
 
-RUN pip3 install --no-cache-dir "cmake==3.31.6"
+# Ubuntu 24.04 marks the system Python externally-managed (PEP 668), so allow the pinned
+# cmake wheel to install system-wide.
+RUN pip3 install --no-cache-dir --break-system-packages "cmake==3.31.6"
 
 COPY common/build_ort.sh /work/build_ort.sh
 COPY VERSIONS.env /work/VERSIONS.env
