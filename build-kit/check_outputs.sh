@@ -11,7 +11,7 @@ fi
 declare -A EXPECT=(
    [cpu]=""
    [webgpu]=""
-   [rocm]="libonnxruntime_providers_rocm.so libonnxruntime_providers_migraphx.so libonnxruntime_providers_shared.so"
+   [rocm]="libonnxruntime_providers_migraphx.so libonnxruntime_providers_shared.so"
    [openvino]="libonnxruntime_providers_openvino.so libonnxruntime_providers_shared.so"
    [cuda-trt]="libonnxruntime_providers_cuda.so libonnxruntime_providers_tensorrt.so libonnxruntime_providers_shared.so"
    [nv-trt-rtx]="libonnxruntime_providers_nv_tensorrt_rtx.so libonnxruntime_providers_shared.so"

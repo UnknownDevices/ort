@@ -3,7 +3,7 @@
 ARG CPU_IMAGE=ubuntu:22.04
 FROM ${CPU_IMAGE}
 
-ARG ORT_VERSION=v1.22.0
+ARG ORT_VERSION=v1.23.2
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \

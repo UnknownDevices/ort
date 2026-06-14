@@ -1,8 +1,10 @@
-# AMD ROCm + MIGraphX build (x86_64).
-ARG ROCM_IMAGE=rocm/dev-ubuntu-22.04:6.2.4-complete
+# AMD MIGraphX build (x86_64). ORT 1.23 removed the ROCm execution provider,
+# so the AMD path is the MIGraphX EP (--use_migraphx). MIGraphX supports
+# gfx906..gfx1201 (RDNA2..RDNA4) on ROCm 7.
+ARG ROCM_IMAGE=rocm/dev-ubuntu-22.04:7.2.4-complete
 FROM ${ROCM_IMAGE}
 
-ARG ORT_VERSION=v1.22.0
+ARG ORT_VERSION=v1.23.2
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Install Ubuntu build tools plus migraphx-dev: the -complete image ships
@@ -22,9 +24,13 @@ COPY common/build_ort.sh /work/build_ort.sh
 COPY VERSIONS.env /work/VERSIONS.env
 RUN chmod +x /work/build_ort.sh
 
+# ORT_GROUP stays "rocm" so downstream staging/bundling paths are unchanged —
+# but note the provider lib produced is now libonnxruntime_providers_migraphx.so
+# (the ROCm provider no longer exists). --use_rocm/--rocm_home were removed in
+# ORT 1.23 (PR #26712); MIGraphX is driven solely by --use_migraphx.
 ENV ORT_VERSION=${ORT_VERSION} \
     ORT_GROUP=rocm \
-    ORT_EP_FLAGS="--use_rocm --rocm_home /opt/rocm --use_migraphx --migraphx_home /opt/rocm --use_xnnpack"
+    ORT_EP_FLAGS="--use_migraphx --migraphx_home /opt/rocm --use_xnnpack"
 
 WORKDIR /src
 ENTRYPOINT ["/work/build_ort.sh"]

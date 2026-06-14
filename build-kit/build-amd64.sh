@@ -7,7 +7,7 @@ cd "$(dirname "$0")"
 source ./VERSIONS.env
 
 : "${ORT_CUDA_ARCHS:=75-real;80-real;86-real;89-real;90-real;100-real;120-real;120-virtual}"
-: "${ORT_ROCM_GFX:=gfx900;gfx906;gfx1010;gfx1030;gfx1100;gfx1101;gfx1102}"
+: "${ORT_ROCM_GFX:=gfx906;gfx1010;gfx1030;gfx1100;gfx1101;gfx1102;gfx1151;gfx1200;gfx1201}"
 
 DOCKER="${DOCKER:-docker}"
 mkdir -p out sdk

@@ -7,9 +7,13 @@ arm64 inference instead of silently falling back to CPU and crashing.
 One pass per box builds **everything that box's targets can use**, with full
 optimization. Runs entirely in Docker so the hosts stay clean.
 
-> Pinned to ONNX Runtime **v1.22.0** (matches this fork's C-API ABI —
-> `ort-sys/dist.txt` → `ms@1.22.0`). Verified that v1.22.0 carries the
-> NV-TensorRT-RTX EP. Do not bump without bumping the fork.
+> Pinned to ONNX Runtime **v1.23.2** for every group. The fork's prebuilt-ABI
+> pin (`ort-sys/dist.txt` → `ms@1.22.0`) only governs *downloaded* binaries;
+> building from source + the Rust crate works against 1.23.2.
+> **AMD note:** ORT 1.23 removed the ROCm execution provider, so the `rocm`
+> group now builds the **MIGraphX** EP (`--use_migraphx`) against **ROCm 7.x** —
+> the only AMD path that reaches RDNA4 (gfx1201). It produces
+> `libonnxruntime_providers_migraphx.so` (no more `..._rocm.so`).
 
 ## What gets built
 
@@ -89,7 +93,7 @@ once in `VERSIONS.env` and everything else follows:
 
 | Group | Built against | App bundles (same major) |
 |---|---|---|
-| `rocm` | ROCm 6.x | `libamdhip64.so.6`, `librocblas.so.4`, `libMIOpen.so.1`, `libmigraphx*.so` |
+| `rocm` | ROCm 7.x | `libmigraphx*.so` + the provider's full `ldd` closure (e.g. `libamdhip64.so.7`, `libamd_comgr.so.3`, rocBLAS/MIOpen) — derive exact sonames via `ldd` against the matching ROCm 7 tree |
 | `openvino` | OpenVINO 2024.x | `libopenvino.so.2024`, plugin `.so`s |
 | `cuda-trt` / `nv-trt-rtx` | CUDA 12.x / TRT 10.x / TRT-RTX 1.3 | `libcudart.so.12`, `libcudnn*.so.9`, `libnvinfer.so.10`, TRT-RTX runtime |
 

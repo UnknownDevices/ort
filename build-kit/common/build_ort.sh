@@ -41,11 +41,13 @@ if [ -n "${CCACHE_DIR:-}" ] && command -v ccache >/dev/null 2>&1; then
    export CMAKE_C_COMPILER_LAUNCHER=ccache CMAKE_CXX_COMPILER_LAUNCHER=ccache
 fi
 
-# MIGraphX needs its cmake config (migraphx-dev). If it's still not present,
-# drop the EP rather than failing the whole AMD build — ROCm is the primary path.
+# MIGraphX needs its cmake config (migraphx-dev). Since ORT 1.23 removed the
+# ROCm EP, MIGraphX is the ONLY AMD GPU EP — dropping it would silently yield a
+# CPU-only "AMD" provider, so a missing config is fatal, not a fallback.
 if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]] && ! find /opt/rocm -name 'migraphx*onfig.cmake' 2>/dev/null | grep -q .; then
-   echo "WARN: MIGraphX cmake config not found under /opt/rocm; building ROCm-only."
-   ORT_EP_FLAGS="$(echo "${ORT_EP_FLAGS}" | sed -E 's/--use_migraphx//; s#--migraphx_home /opt/rocm##')"
+   echo "ERROR: MIGraphX cmake config not found under /opt/rocm (install migraphx-dev)." >&2
+   echo "       ORT 1.23 has no ROCm EP fallback — refusing to build a CPU-only AMD provider." >&2
+   exit 1
 fi
 
 EXTRA_ARGS=()
@@ -61,11 +63,12 @@ fi
 if [ -n "${NVCC_THREADS:-}" ] && { [[ "${ORT_EP_FLAGS}" == *use_cuda* ]] || [[ "${ORT_EP_FLAGS}" == *nv_tensorrt_rtx* ]]; }; then
    EXTRA_ARGS+=(--nvcc_threads "${NVCC_THREADS}")
 fi
-# ROCm: disable Composable Kernel (fused attention/GEMM — unused by CNN/YOLO
-# inference, an enormous build, and it errors with empty HIP_ARCHITECTURES on
-# the composable_kernel_fmha target). Set the gfx arch list for the remaining
-# HIP targets (runtime coverage bounded by the MIOpen/rocBLAS in ROCM_IMAGE).
-if [[ "${ORT_EP_FLAGS}" == *use_rocm* ]]; then
+# AMD (MIGraphX): disable Composable Kernel (fused attention/GEMM — unused by
+# CNN/YOLO inference, an enormous build, and it errors with empty
+# HIP_ARCHITECTURES on the composable_kernel_fmha target). Set the gfx arch list
+# for the HIP targets (runtime coverage bounded by the MIOpen/rocBLAS in
+# ROCM_IMAGE). Keyed off use_migraphx since --use_rocm no longer exists in 1.23.
+if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]]; then
    EXTRA_ARGS+=(--cmake_extra_defines onnxruntime_USE_COMPOSABLE_KERNEL=OFF)
    [ -n "${ORT_ROCM_GFX:-}" ] && EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_HIP_ARCHITECTURES=${ORT_ROCM_GFX}")
 fi

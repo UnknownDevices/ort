@@ -5,7 +5,7 @@
 ARG NV_TENSORRT_IMAGE=nvcr.io/nvidia/tensorrt:25.01-py3
 FROM ${NV_TENSORRT_IMAGE}
 
-ARG ORT_VERSION=v1.22.0
+ARG ORT_VERSION=v1.23.2
 ARG TRT_RTX_URL=https://developer.nvidia.com/downloads/trt/rtx_sdk/secure/1.3/TensorRT-RTX-1.3.0.35-linux-x86_64-cuda-12.9-Release-external.tar.gz
 ENV DEBIAN_FRONTEND=noninteractive
 
