@@ -49,7 +49,9 @@ fi
 # MIGraphX needs its cmake config (migraphx-dev). Since ORT 1.23 removed the
 # ROCm EP, MIGraphX is the ONLY AMD GPU EP — dropping it would silently yield a
 # CPU-only "AMD" provider, so a missing config is fatal, not a fallback.
-if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]] && ! find /opt/rocm -name 'migraphx*onfig.cmake' 2>/dev/null | grep -q .; then
+# -L: /opt/rocm is a versioned symlink (-> /opt/rocm-7.x) on the ROCm image, and find's
+# default -P won't descend into a symlinked start path, so it must follow links here.
+if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]] && ! find -L /opt/rocm -name 'migraphx*onfig.cmake' 2>/dev/null | grep -q .; then
    echo "ERROR: MIGraphX cmake config not found under /opt/rocm (install migraphx-dev)." >&2
    echo "       ORT 1.23 has no ROCm EP fallback — refusing to build a CPU-only AMD provider." >&2
    exit 1
