@@ -160,6 +160,7 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 			let options = ort_sys::OrtMIGraphXProviderOptions {
 				device_id: self.device_id,
 				migraphx_fp16_enable: self.enable_fp16.into(),
+				migraphx_fp8_enable: 0,
 				migraphx_int8_enable: self.enable_int8.into(),
 				migraphx_use_native_calibration_table: self.use_native_calibration_table.into(),
 				migraphx_int8_calibration_table_name: self.int8_calibration_table_name.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
@@ -167,7 +168,9 @@ impl ExecutionProvider for MIGraphXExecutionProvider {
 				migraphx_load_model_path: self.load_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
 				migraphx_save_compiled_model: self.save_model_path.is_some().into(),
 				migraphx_save_model_path: self.save_model_path.as_ref().map(|c| c.as_ptr()).unwrap_or_else(ptr::null),
-				migraphx_exhaustive_tune: self.exhaustive_tune
+				migraphx_exhaustive_tune: self.exhaustive_tune,
+				migraphx_mem_limit: 0,
+				migraphx_arena_extend_strategy: 0
 			};
 			ortsys![unsafe SessionOptionsAppendExecutionProvider_MIGraphX(session_builder.ptr_mut(), &options)?];
 			return Ok(());
