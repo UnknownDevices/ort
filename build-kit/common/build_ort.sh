@@ -80,6 +80,56 @@ if [[ "${ORT_EP_FLAGS}" == *use_migraphx* ]]; then
    [ -n "${ORT_ROCM_GFX:-}" ] && EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_HIP_ARCHITECTURES=${ORT_ROCM_GFX}")
 fi
 
+# clang (used for the WebGPU build) rejects ORT's GCC-style 2-arg
+# __builtin_ia32_tpause in spin_pause.cc — clang's builtin takes 3 args. Swap it
+# for the portable _tpause() intrinsic, which both GCC and clang accept with the
+# (control, uint64 counter) signature the file's own _WIN32 branch already uses.
+if [[ "${ORT_EP_FLAGS}" == *use_webgpu* ]]; then
+   sp="${SRC_DIR}/onnxruntime/core/common/spin_pause.cc"
+   if [ -f "$sp" ] && grep -q '__builtin_ia32_tpause' "$sp"; then
+      sed -i 's/__builtin_ia32_tpause(/_tpause(/g' "$sp"
+      echo "Patched spin_pause.cc: __builtin_ia32_tpause -> _tpause (clang compat)"
+   fi
+fi
+
+# Dawn (WebGPU) is a clang-only codebase: with GCC it fails to compile
+# (`redefinition of class dawn::native::stream::Stream<T>`) and its build passes
+# clang-only `-Wno-*` flags GCC rejects. So when building WebGPU, compile ORT's
+# host C++ with clang. Prefer ROCm's bundled clang (modern, and libstdc++
+# ABI-compatible with the gcc-built ROCm/MIGraphX libs we link); fall back to any
+# system clang. HIP kernels still go through ORT's own HIP toolchain detection.
+#
+# Pass the compiler EXPLICITLY to cmake (env CC/CXX is ignored once a build dir
+# has a cached compiler — e.g. a persistent BUILD_STORAGE_DIR from a prior GCC
+# run), and wipe the build dir if it was configured with a different compiler
+# (cmake refuses to switch compilers in place, and GCC/clang objects can't be
+# LTO-linked together anyway).
+if [[ "${ORT_EP_FLAGS}" == *use_webgpu* ]]; then
+   WEBGPU_CXX=""
+   for cxx in /opt/rocm/llvm/bin/clang++ clang++-18 clang++-17 clang++-16 clang++-15 clang++; do
+      if command -v "$cxx" >/dev/null 2>&1 || [ -x "$cxx" ]; then WEBGPU_CXX="$cxx"; break; fi
+   done
+   [ -n "${WEBGPU_CXX}" ] || { echo "ERROR: WebGPU build needs clang; none found." >&2; exit 1; }
+   WEBGPU_CC="${WEBGPU_CXX/clang++/clang}"
+   export CC="${WEBGPU_CC}" CXX="${WEBGPU_CXX}"
+   EXTRA_ARGS+=(--cmake_extra_defines "CMAKE_C_COMPILER=${WEBGPU_CC}"
+                --cmake_extra_defines "CMAKE_CXX_COMPILER=${WEBGPU_CXX}"
+                # Build Dawn as a monolithic shared lib (libwebgpu_dawn.so) that
+                # EXPORTS the WebGPU C API, with libonnxruntime dynamically
+                # linking it. Lets our Rust side FFI the SAME Dawn ORT uses →
+                # inject a shared device + bind a WGPUBuffer as a zero-copy
+                # input. (Default OFF statically archives Dawn, 0 exported wgpu*
+                # symbols.) Do NOT also set USE_EXTERNAL_DAWN — mutually
+                # exclusive, and it forces us to ship the proc table instead.
+                --cmake_extra_defines onnxruntime_BUILD_DAWN_MONOLITHIC_LIBRARY=ON)
+   echo "WebGPU build -> host compiler: ${WEBGPU_CXX} ($("${WEBGPU_CXX}" --version 2>/dev/null | head -1))"
+   cache="${BUILD_DIR}/Release/CMakeCache.txt"
+   if [ -f "$cache" ] && ! grep -qsF "CMAKE_CXX_COMPILER:FILEPATH=${WEBGPU_CXX}" "$cache"; then
+      echo "Build dir was configured with a different compiler; wiping ${BUILD_DIR} for a clean clang configure."
+      rm -rf "${BUILD_DIR}"
+   fi
+fi
+
 cd "${SRC_DIR}"
 # shellcheck disable=SC2086
 python3 tools/ci_build/build.py \
@@ -98,6 +148,34 @@ python3 tools/ci_build/build.py \
 REL="${BUILD_DIR}/Release"
 mkdir -p "${OUT_DIR}/lib"
 find "${REL}" -maxdepth 1 -name 'libonnxruntime*.so*' -exec cp -a {} "${OUT_DIR}/lib/" \;
+
+# WebGPU: depending on ORT's cmake, Dawn is either statically linked into
+# libonnxruntime (nothing extra to harvest) or emitted as a separate
+# libwebgpu_dawn.so that libonnxruntime needs at load time. Harvest it if
+# present — it may live in a _deps subdir, not next to libonnxruntime in
+# Release/, so search the whole build tree. (Downstream: this .so must be
+# staged + bundled into the AppImage on the app side.)
+if [[ "${ORT_EP_FLAGS}" == *use_webgpu* ]]; then
+   find "${BUILD_DIR}" -name 'libwebgpu_dawn*.so*' -exec cp -a {} "${OUT_DIR}/lib/" \; 2>/dev/null || true
+
+   # Harvest the GENERATED Dawn C header that matches THIS libwebgpu_dawn.so.
+   # The app FFIs Dawn via bindgen, so its struct layouts must come from this
+   # exact header — a hand-vendored copy from a different Dawn version leaves
+   # newer trailing struct fields uninitialized and ORT segfaults reading past
+   # them. Several webgpu.h exist in the tree (vanilla webgpu-headers, etc.);
+   # pick the Dawn-flavored one, identified by a Dawn-only symbol.
+   dawn_hdr=""
+   while IFS= read -r cand; do
+      if grep -q 'WGPUSharedTextureMemory' "$cand" 2>/dev/null; then dawn_hdr="$cand"; break; fi
+   done < <(find "${BUILD_DIR}" -name 'webgpu.h' 2>/dev/null)
+   if [ -n "$dawn_hdr" ]; then
+      mkdir -p "${OUT_DIR}/include/dawn"
+      cp -a "$dawn_hdr" "${OUT_DIR}/include/dawn/webgpu.h"
+      echo "Harvested Dawn header: ${dawn_hdr} -> ${OUT_DIR}/include/dawn/webgpu.h"
+   else
+      echo "WARN: use_webgpu build but no Dawn-flavored webgpu.h found under ${BUILD_DIR}" >&2
+   fi
+fi
 
 {
    echo "onnxruntime ${ORT_VERSION}  group=${ORT_GROUP}  arch=$(uname -m)"
