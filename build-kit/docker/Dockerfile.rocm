@@ -1,6 +1,10 @@
-# AMD MIGraphX build (x86_64). ORT 1.23 removed the ROCm execution provider,
-# so the AMD path is the MIGraphX EP (--use_migraphx). MIGraphX supports
-# gfx906..gfx1201 (RDNA2..RDNA4) on ROCm 7.
+# AMD build (x86_64): MIGraphX (--use_migraphx) PLUS the WebGPU EP
+# (--use_webgpu, Dawn over Vulkan) built into the SAME libonnxruntime core, so
+# the AMD app carries both providers and can pick MIGraphX or WebGPU at runtime.
+# WebGPU is the driver-portable fallback: it runs on the machine's Vulkan driver
+# (RADV/AMDVLK) instead of the ROCm/HIP stack, which is unreliable on some
+# users' kernel/driver combos. MIGraphX supports gfx906..gfx1201 (RDNA2..RDNA4)
+# on ROCm 7; WebGPU is GPU-arch-agnostic.
 ARG ROCM_IMAGE=rocm/dev-ubuntu-22.04:7.2.4-complete
 FROM ${ROCM_IMAGE}
 
@@ -12,11 +16,25 @@ ENV DEBIAN_FRONTEND=noninteractive
 # requires. migraphx-dev comes from the image's ROCm apt repo, whose signing key
 # is rotated/unverifiable — so the clean path fails and we install tolerantly
 # (build container, official AMD repo over TLS).
-RUN PKGS="git python3 python3-pip python3-dev build-essential ninja-build ccache curl ca-certificates patchelf migraphx-dev"; \
+# Base tools + migraphx-dev, plus WebGPU/Dawn's build deps: pkg-config, the
+# Vulkan loader/headers Dawn targets, and the X11 dev libs Dawn's windowing
+# layer links even for headless compute. gnupg is for the NodeSource key below.
+RUN PKGS="git python3 python3-pip python3-dev build-essential ninja-build ccache curl ca-certificates gnupg patchelf migraphx-dev \
+          pkg-config libvulkan-dev vulkan-tools libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev clang"; \
     if ! { apt-get update && apt-get install -y --no-install-recommends $PKGS; }; then \
        apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::AllowInsecureRepositories=true && \
        apt-get install -y --no-install-recommends --allow-unauthenticated $PKGS; \
     fi && rm -rf /var/lib/apt/lists/*
+
+# ORT 1.23's WebGPU EP runs Node.js at configure time (node_helper.cmake -> WGSL
+# template codegen). Ubuntu 22.04's apt node is EOL (12.x), so install a current
+# LTS from NodeSource. Tolerate the ROCm image's rotated/unverifiable apt key
+# the same way the base install does (`|| true` on the setup's own apt update,
+# then a tolerant update+install).
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - || true; \
+    apt-get update -o Acquire::Check-Valid-Until=false -o Acquire::AllowInsecureRepositories=true && \
+    apt-get install -y --no-install-recommends --allow-unauthenticated nodejs && \
+    rm -rf /var/lib/apt/lists/*
 
 RUN pip3 install --no-cache-dir "cmake==3.31.6"
 
@@ -28,9 +46,12 @@ RUN chmod +x /work/build_ort.sh
 # but note the provider lib produced is now libonnxruntime_providers_migraphx.so
 # (the ROCm provider no longer exists). --use_rocm/--rocm_home were removed in
 # ORT 1.23 (PR #26712); MIGraphX is driven solely by --use_migraphx.
+# --use_webgpu adds the Dawn/Vulkan EP INTO this same core (compiled into
+# libonnxruntime, no separate provider .so) — Dawn itself may emit a
+# libwebgpu_dawn.so that build_ort.sh harvests alongside.
 ENV ORT_VERSION=${ORT_VERSION} \
     ORT_GROUP=rocm \
-    ORT_EP_FLAGS="--use_migraphx --migraphx_home /opt/rocm --use_xnnpack"
+    ORT_EP_FLAGS="--use_migraphx --migraphx_home /opt/rocm --use_webgpu --use_xnnpack"
 
 WORKDIR /src
 ENTRYPOINT ["/work/build_ort.sh"]
